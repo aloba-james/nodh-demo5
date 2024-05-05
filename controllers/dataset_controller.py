@@ -1,51 +1,6 @@
 from mysql.connector import connect, Error
-from schema import User, Group
-from sql_config import get_sql_config
-
-class UserController:
-    def __init__(self):
-        self.sql_config = get_sql_config()
-
-    def create_user(self, username, password):
-        try:
-            with connect(**self.sql_config) as conn:
-                with conn.cursor() as cursor:
-                    cursor.execute("""
-                        CREATE TABLE IF NOT EXISTS users (
-                            id INT AUTO_INCREMENT PRIMARY KEY,
-                            username VARCHAR(255) UNIQUE,
-                            password VARCHAR(255)
-                        )
-                    """)
-                    cursor.execute("INSERT INTO users (username, password) VALUES (%s, %s)", (username, password))
-                    conn.commit()
-                    print("User created successfully")
-                    return {"message": "User created successfully"}
-        except Error as e:
-            print("Error creating user:", e)
-            return {"error": "Failed to create user"}
-
-class GroupController:
-    def __init__(self):
-        self.sql_config = get_sql_config()
-
-    def create_group(self, name):
-        try:
-            with connect(**self.sql_config) as conn:
-                with conn.cursor() as cursor:
-                    cursor.execute("""
-                        CREATE TABLE IF NOT EXISTS groups (
-                            id INT AUTO_INCREMENT PRIMARY KEY,
-                            name VARCHAR(255) UNIQUE
-                        )
-                    """)
-                    cursor.execute("INSERT INTO groups (name) VALUES (%s)", (name,))
-                    conn.commit()
-                    print("Group created successfully")
-                    return {"message": "Group created successfully"}
-        except Error as e:
-            print("Error creating group:", e)
-            return {"error": "Failed to create group"}
+from mysql_config import get_sql_config
+from schema import EntDataset
 
 class DatasetController:
     def __init__(self):
@@ -73,27 +28,34 @@ class DatasetController:
             print("Error creating dataset:", e)
             return {"error": "Failed to create dataset"}
 
-    def get_dataset(self, dataset_id):
+    def get_datasets(self, offset=0, limit=10):
         try:
             with connect(**self.sql_config) as conn:
                 with conn.cursor() as cursor:
-                    cursor.execute("SELECT * FROM datasets WHERE id = %s", (dataset_id,))
-                    dataset = cursor.fetchone()
-                    if dataset:
-                        dataset_dict = {
-                            "id": dataset[0],
-                            "name": dataset[1],
-                            "description": dataset[2],
-                            "created_by": dataset[3],
-                            "created_at": dataset[4].timestamp()
-                        }
-                        return dataset_dict
+                    cursor.execute("SELECT id, name, description, created_by, created_at FROM datasets LIMIT %s OFFSET %s", (limit, offset))
+                    datasets_data = cursor.fetchall()
+                    datasets = [EntDataset(*dataset_data) for dataset_data in datasets_data]
+                    print("Datasets retrieved successfully")
+                    return {"datasets": datasets}
+        except Error as e:
+            print("Error retrieving datasets:", e)
+            return {"error": "Failed to retrieve datasets"}
+
+    def get_dataset_by_id(self, dataset_id):
+        try:
+            with connect(**self.sql_config) as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("SELECT id, name, description, created_by, created_at FROM datasets WHERE id = %s", (dataset_id,))
+                    dataset_data = cursor.fetchone()
+                    if dataset_data:
+                        dataset = EntDataset(*dataset_data)
+                        print("Dataset retrieved successfully")
+                        return {"dataset": dataset}
                     else:
                         return {"error": "Dataset not found"}
         except Error as e:
             print("Error retrieving dataset:", e)
             return {"error": "Failed to retrieve dataset"}
-
     def update_dataset(self, dataset_id, name, description):
         try:
             with connect(**self.sql_config) as conn:
